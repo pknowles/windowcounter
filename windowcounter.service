@@ -1,0 +1,9 @@
+[Service]
+User=pknowles
+StandardOutput=null
+StandardError=syslog
+ExecStart=/usr/local/share/windowcounter/windowcounter.py
+
+[Install]
+WantedBy=multi-user.target
+
