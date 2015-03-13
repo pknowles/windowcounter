@@ -7,6 +7,7 @@ import subprocess
 import sqlite3
 import signal
 import datetime
+import time
 from time import sleep
 
 #TODO: http://askubuntu.com/questions/202136/how-can-a-script-detect-a-users-idle-time
@@ -52,7 +53,7 @@ def get_active_window():
 			
 	return info
 
-sleeptime = 1
+sleeptime = 5
 savetime = 300
 
 thisdir = os.path.dirname(os.path.realpath(__file__))
@@ -95,23 +96,32 @@ if "-q" in sys.argv:
 
 dat = {}
 i = savetime
+start_time = time.time()
+last_time = start_time
 while True:
-	info = get_active_window()
-	name = info.get('exe', 'unknown')
-	title = info.get('name', 'unknown')
-	
-	name = os.path.split(name)[-1]
+	this_time = time.time()
+	while this_time - last_time > sleeptime:
+		elapsed_time = this_time - last_time
+		last_time += sleeptime
 
-	with con:
-		cur.execute("INSERT OR IGNORE INTO wc(Name, Title) VALUES (?, ?)", (name,title))
-		cur.execute("UPDATE wc SET Count=Count+? WHERE Name = ? AND Title = ? AND Date = date('now')", (sleeptime,name,title))
+		info = get_active_window()
+		name = info.get('exe', 'unknown')
+		title = info.get('name', 'unknown')
 	
-	i += sleeptime
-	if i > savetime:
-		print "Saving"
-		con.commit()
-		i -= savetime
+		name = os.path.split(name)[-1]
+
+		with con:
+			cur.execute("INSERT OR IGNORE INTO wc(Name, Title) VALUES (?, ?)", (name,title))
+			cur.execute("UPDATE wc SET Count=Count+? WHERE Name = ? AND Title = ? AND Date = date('now')", (sleeptime,name,title))
 	
-	sleep(sleeptime)
+		query()
+	
+		i += elapsed_time
+		if i > savetime:
+			print "Saving"
+			con.commit()
+			i -= savetime
+	
+	sleep(1)
 		
 
