@@ -6,7 +6,11 @@ import sys
 import subprocess
 import sqlite3
 import signal
+import datetime
 from time import sleep
+
+#TODO: http://askubuntu.com/questions/202136/how-can-a-script-detect-a-users-idle-time
+#http://stackoverflow.com/questions/1770209/run-child-processes-as-different-user-from-a-long-running-process/6037494#6037494
 
 new_env = os.environ.copy()
 new_env['DISPLAY'] = ':0'
@@ -76,10 +80,14 @@ def query():
 		commonapps = cur.fetchall()
 		cur.execute("SELECT Count, Name, Title FROM wc WHERE Date = date('now') AND Name != 'unknown' ORDER BY Count DESC LIMIT 10")
 		commonwindows = cur.fetchall()
+	print "By Process"
 	for row in commonapps:
-		print ' '.join(map(str, row))
+		time = datetime.timedelta(seconds=row[0])
+		print "", time, ' '.join(map(str, row[1:]))
+	print "Top Titles"
 	for row in commonwindows:
-		print ' '.join(map(str, row))
+		time = datetime.timedelta(seconds=row[0])
+		print "", time, ' '.join(map(str, row[1:]))
 
 if "-q" in sys.argv:
 	query()
