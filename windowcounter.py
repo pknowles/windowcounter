@@ -24,12 +24,14 @@ def get_active_window():
 	id_w = None
 	id_p = None
 	for line in root.stdout:
-		m = re.search('^_NET_ACTIVE_WINDOW.* ([\w]+)$', line)
+		#m = re.search('^_NET_ACTIVE_WINDOW.* ([\w]+)$', line)
+		m = re.search('^_NET_ACTIVE_WINDOW.* (0x[0-9A-F]+)$', line)
 		if m != None:
 			id_ = m.group(1)
-			info['id'] = id_
-			id_w = subprocess.Popen(['xprop', '-id', id_, 'WM_NAME'], stdout=subprocess.PIPE, env=new_env)
-			id_p = subprocess.Popen(['xprop', '-id', id_, '_NET_WM_PID'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=new_env)
+			info['id'] = int(id_, 0)
+			if info['id'] > 0:
+				id_w = subprocess.Popen(['xprop', '-id', id_, 'WM_NAME'], stdout=subprocess.PIPE, env=new_env)
+				id_p = subprocess.Popen(['xprop', '-id', id_, '_NET_WM_PID'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=new_env)
 			break
 
 	if id_w != None:
@@ -55,6 +57,8 @@ def get_active_window():
 
 sleeptime = 5
 savetime = 300
+warnsame = 60*5
+dontwarn = ['gedit']
 
 thisdir = os.path.dirname(os.path.realpath(__file__))
 home = os.path.expanduser("~")
@@ -98,6 +102,9 @@ dat = {}
 i = savetime
 start_time = time.time()
 last_time = start_time
+timecheck = 0
+windowtime = 0
+lastwindow=""
 while True:
 	this_time = time.time()
 	while this_time - last_time > sleeptime:
@@ -113,12 +120,26 @@ while True:
 		with con:
 			cur.execute("INSERT OR IGNORE INTO wc(Name, Title) VALUES (?, ?)", (name,title))
 			cur.execute("UPDATE wc SET Count=Count+? WHERE Name = ? AND Title = ? AND Date = date('now')", (sleeptime,name,title))
+			timecheck += sleeptime
 	
-		query()
+		if lastwindow == name:
+			windowtime += sleeptime
+			if windowtime >= warnsame:
+				if name not in dontwarn:
+					#os.system("locate -r '\.wav$' | head -n $(( ( RANDOM % 200 )  + 1 )) | tail -4 | xargs -I {} paplay \"{}\"")
+					subprocess.Popen(['paplay', '/usr/share/sounds/pop.wav'], stdout=subprocess.PIPE, env=new_env)
+					subprocess.Popen(['notify-send', '-t', '5000', 'GET BACK TO WORK!!!'], stdout=subprocess.PIPE, env=new_env)
+				windowtime = 0
+		else:
+			windowtime = 0
+		lastwindow = name
+	
+		#query()
 	
 		i += elapsed_time
 		if i > savetime:
-			print "Saving"
+			#print "Saving"
+			#sys.stderr.write(str(this_time - start_time) + " " + str(timecheck) + "\n")
 			con.commit()
 			i -= savetime
 	
