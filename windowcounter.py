@@ -16,23 +16,35 @@ from time import sleep
 new_env = os.environ.copy()
 new_env['DISPLAY'] = ':0'
 
+DEVNULL = open(os.devnull, 'wb')
+
 def get_active_window():
 	info = {}
 	
-	root = subprocess.Popen(['xprop', '-root', '_NET_ACTIVE_WINDOW'], stdout=subprocess.PIPE, env=new_env)
+	root = subprocess.Popen(['xprop', '-root', '_NET_ACTIVE_WINDOW'], stdout=subprocess.PIPE, stderr=DEVNULL, env=new_env)
 
 	id_w = None
 	id_p = None
 	for line in root.stdout:
 		#m = re.search('^_NET_ACTIVE_WINDOW.* ([\w]+)$', line)
-		m = re.search('^_NET_ACTIVE_WINDOW.* (0x[0-9A-F]+)$', line)
+		m = re.search('^_NET_ACTIVE_WINDOW.* (0x[0-9a-f]+)$', line)
 		if m != None:
 			id_ = m.group(1)
 			info['id'] = int(id_, 0)
 			if info['id'] > 0:
 				id_w = subprocess.Popen(['xprop', '-id', id_, 'WM_NAME'], stdout=subprocess.PIPE, env=new_env)
 				id_p = subprocess.Popen(['xprop', '-id', id_, '_NET_WM_PID'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=new_env)
+			else:
+				print "Invalid ID", id_
 			break
+	
+	root.communicate()
+	if root.returncode != 0:
+		print "Error"
+		return info
+	
+	if info.get('id',0) > 0 and ( not id_w or not id_p ):
+		print "Got ID but no info"
 
 	if id_w != None:
 		for line in id_w.stdout:
@@ -52,7 +64,7 @@ def get_active_window():
 			if pid != -1:
 				exe = os.path.realpath('/proc/' + str(pid) + '/exe')
 				info['exe'] = exe
-			
+	
 	return info
 
 sleeptime = 5
@@ -85,6 +97,8 @@ def query():
 		commonapps = cur.fetchall()
 		cur.execute("SELECT Count, Name, Title FROM wc WHERE Date = date('now') AND Name != 'unknown' ORDER BY Count DESC LIMIT 10")
 		commonwindows = cur.fetchall()
+		cur.execute("SELECT sum(Count), Date FROM wc WHERE Name = 'gedit' AND Title LIKE '%.tex%' GROUP BY Date ORDER BY Date DESC LIMIT 10")
+		gedittex = cur.fetchall()
 	print "By Process"
 	for row in commonapps:
 		time = datetime.timedelta(seconds=row[0])
@@ -93,6 +107,11 @@ def query():
 	for row in commonwindows:
 		time = datetime.timedelta(seconds=row[0])
 		print "", time, ' '.join(map(str, row[1:]))
+	print "Gedit .tex"
+	for row in gedittex:
+		time = datetime.timedelta(seconds=row[0])
+		print "", time, ' '.join(map(str, row[1:]))
+		
 
 if "-q" in sys.argv:
 	query()
@@ -140,6 +159,8 @@ while True:
 		if i > savetime:
 			#print "Saving"
 			#sys.stderr.write(str(this_time - start_time) + " " + str(timecheck) + "\n")
+			if abs((this_time - start_time) - timecheck) > 1.5:
+				sys.stderr.write("Time anomaly: " + str(this_time - start_time) + " " + str(timecheck) + "\n")
 			con.commit()
 			i -= savetime
 	
